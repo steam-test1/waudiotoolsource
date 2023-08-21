@@ -1,1 +1,1 @@
-# wwise_ima_adpcm source that compiles
+# wwise_ima_adpcm source project

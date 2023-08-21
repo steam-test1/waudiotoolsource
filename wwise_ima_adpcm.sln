@@ -1,0 +1,21 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.6.33829.357
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "wwise_ima_adpcm", "wwise_ima_adpcm.csproj", "{D6DBEAF9-D602-47CC-9D2A-D5403FF2520C}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|x86 = Debug|x86
+		Release|x86 = Release|x86
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{D6DBEAF9-D602-47CC-9D2A-D5403FF2520C}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{D6DBEAF9-D602-47CC-9D2A-D5403FF2520C}.Debug|x86.Build.0 = Debug|Any CPU
+		{D6DBEAF9-D602-47CC-9D2A-D5403FF2520C}.Release|x86.ActiveCfg = Release|x86
+		{D6DBEAF9-D602-47CC-9D2A-D5403FF2520C}.Release|x86.Build.0 = Release|x86
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal
