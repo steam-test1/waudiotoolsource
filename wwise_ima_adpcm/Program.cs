@@ -1,178 +1,200 @@
-using System;
-using System.Collections.Generic;
-using System.IO;
+﻿// --------------------------------------------------------------------------------------------------------------------
+// <copyright file="Program.cs" company="Zwagoth">
+//   This code is released into the public domain by Zwagoth.
+// </copyright>
+// <summary>
+//   Decodes Wwise IMA ADPCM audio into PCM audio.
+// </summary>
+// --------------------------------------------------------------------------------------------------------------------
 
 namespace wwise_ima_adpcm
 {
-	internal class Program
-	{
-		public Program()
-		{
-		}
+    using System;
+    using System.Collections.Generic;
+    using System.IO;
+    using System.Text;
 
-		public static void Decode(string inFile, string outFile)
-		{
-			using (FileStream fileStream = new FileStream(inFile, FileMode.Open, FileAccess.Read))
-			{
-				int num = 0;
-				BinaryReader binaryReader = new BinaryReader(fileStream);
-				WAVHeader wAVHeader = WAVHeader.DecodeHeader(binaryReader);
-				if (wAVHeader.Format == 2 || wAVHeader.BitsPerSample == 4 || wAVHeader.BlockAlignment == 36 * wAVHeader.ChannelCount)
-				{
-					using (FileStream fileStream1 = new FileStream(outFile, FileMode.Create, FileAccess.Write))
-					{
-						BinaryWriter binaryWriter = new BinaryWriter(fileStream1);
-						WAVHeader wAVHeader1 = new WAVHeader()
-						{
-							Format = 1,
-							ChannelCount = wAVHeader.ChannelCount,
-							SampleRate = wAVHeader.SampleRate,
-							BitsPerSample = 16
-						};
-						WAVHeader channelCount = wAVHeader1;
-						channelCount.BlockAlignment = (ushort)(channelCount.ChannelCount * 2);
-						channelCount.DataRate = channelCount.BlockAlignment * channelCount.SampleRate;
-						WAVHeader.EncodeHeader(binaryWriter, channelCount);
-						short[] numArray = new short[64 * channelCount.ChannelCount];
-						for (int i = 0; i < (wAVHeader.DataLength / wAVHeader.BlockAlignment); i++)
-						{
-							for (int j = 0; j < wAVHeader.ChannelCount; j++)
-							{
-								IMADecoder.Decode(binaryReader, ref numArray, 1, j, (int)wAVHeader.ChannelCount);
-							}
-							short[] numArray1 = numArray;
-							for (int k = 0; k < (int)numArray1.Length; k++)
-							{
-								binaryWriter.Write(numArray1[k]);
-								num += 2;
-							}
-						}
-						binaryWriter.Seek(4, SeekOrigin.Begin);
-						binaryWriter.Write(36 + num);
-						binaryWriter.Seek(40, SeekOrigin.Begin);
-						binaryWriter.Write(num);
-						binaryReader.Close();
-						binaryWriter.Close();
-					}
-				}
-				else
-				{
-					object[] format = new object[] { wAVHeader.Format, wAVHeader.BitsPerSample, wAVHeader.BlockAlignment, wAVHeader.SampleRate };
-					Console.WriteLine("[ERROR] Invalid input file format. Expected Wwise IMA ADPCM. Found Format: {0}, BitsPerSample: {1}, BlockAlignment: {2}, SampleRate: {3}", format);
-				}
-			}
-		}
+    /// <summary>
+    /// The program.
+    /// </summary>
+    internal class Program
+    {
+        #region Methods
 
-		public static void Encode(string inFile, string outFile)
-		{
-			using (FileStream fileStream = new FileStream(inFile, FileMode.Open, FileAccess.Read))
-			{
-				int num = 0;
-				BinaryReader binaryReader = new BinaryReader(fileStream);
-				WAVHeader wAVHeader = WAVHeader.DecodeHeader(binaryReader);
-				if (wAVHeader.BitsPerSample != 16 || wAVHeader.Format != 1)
-				{
-					Console.WriteLine("[ERROR] Input file must be a well formed signed 16bit PCM WAV file.");
-				}
-				else
-				{
-					using (FileStream fileStream1 = new FileStream(outFile, FileMode.Create, FileAccess.Write))
-					{
-						BinaryWriter binaryWriter = new BinaryWriter(fileStream1);
-						WAVHeader wAVHeader1 = new WAVHeader()
-						{
-							Format = 2,
-							ChannelCount = wAVHeader.ChannelCount,
-							SampleRate = wAVHeader.SampleRate,
-							BitsPerSample = 4
-						};
-						WAVHeader channelCount = wAVHeader1;
-						channelCount.BlockAlignment = (ushort)(36 * channelCount.ChannelCount);
-						channelCount.DataRate = channelCount.SampleRate / 64 * channelCount.BlockAlignment;
-						WAVHeader.EncodeIMAHeader(binaryWriter, channelCount);
-						IMAEncoder[] mAEncoder = new IMAEncoder[channelCount.ChannelCount];
-						for (int i = 0; i < channelCount.ChannelCount; i++)
-						{
-							mAEncoder[i] = new IMAEncoder();
-						}
-						long position = binaryReader.BaseStream.Position;
-						int blockAlignment = 64;
-						int num1 = 0;
-						while ((wAVHeader.DataLength - (blockAlignment - 64)) / wAVHeader.BlockAlignment > (long)64)
-						{
-							for (int j = 0; j < wAVHeader.ChannelCount; j++)
-							{
-								binaryReader.BaseStream.Seek(position + (long)(j * 2), SeekOrigin.Begin);
-								mAEncoder[j].Encode(binaryReader, (int)wAVHeader.ChannelCount, 64);
-								mAEncoder[j].WriteOut(binaryWriter);
-								num += 36;
-							}
-							position += (long)(wAVHeader.BlockAlignment * 64);
-							blockAlignment = blockAlignment + wAVHeader.BlockAlignment * 64;
-							num1++;
-						}
-						long dataLength = (long)((wAVHeader.DataLength - (blockAlignment - 64)) / wAVHeader.BlockAlignment);
-						for (int k = 0; dataLength > (long)0 && k < wAVHeader.ChannelCount; k++)
-						{
-							binaryReader.BaseStream.Seek(position + (long)(k * 2), SeekOrigin.Begin);
-							mAEncoder[k].Encode(binaryReader, (int)wAVHeader.ChannelCount, (int)dataLength);
-							mAEncoder[k].WriteOut(binaryWriter);
-							num += 36;
-						}
-						binaryWriter.Seek(4, SeekOrigin.Begin);
-						binaryWriter.Write((int)fileStream1.Length - 8);
-						binaryWriter.Seek(60, SeekOrigin.Begin);
-						binaryWriter.Write(num);
-						binaryReader.Close();
-						binaryWriter.Close();
-					}
-				}
-			}
-		}
+        /// <summary>
+        /// The main.
+        /// </summary>
+        /// <param name="args">
+        /// The args.
+        /// </param>
+        private static void Main(string[] args)
+        {
+            if ((args.Length == 0) || (args.Length == 2) || (args.Length > 3))
+            {
+                Console.WriteLine("Usage: wwise_ima_adpcm -d/-e <infile> <outfile>");
+                Console.WriteLine("For multiple files: wwise_ima_adpcm -d_all/-e_all");
+                return;
+            }
 
-		private static void Main(string[] args)
-		{
-			if ((int)args.Length == 0 || (int)args.Length == 2 || (int)args.Length > 3)
-			{
-				Console.WriteLine("Usage: wwise_ima_adpcm -d/-e <infile> <outfile>");
-				Console.WriteLine("For multiple files: wwise_ima_adpcm -d_all/-e_all");
-				return;
-			}
-			try
-			{
-				if (args[0] == "-d")
-				{
-					Program.Decode(args[1], args[2]);
-				}
-				else if (args[0] == "-e")
-				{
-					Program.Encode(args[1], args[2]);
-				}
-				else if (args[0] == "-e_all")
-				{
-					foreach (string str in Directory.EnumerateFiles(".", "*.wav"))
-					{
-						Console.WriteLine(string.Concat("Encoding: ", str.Replace(".\\", "")));
-						Program.Encode(str, str.Replace(".wav", ".stream"));
-					}
-				}
-				else if (args[0] != "-d_all")
-				{
-					Console.WriteLine("[ERROR] Must specify either -d to decode, or -e to encode.");
-				}
-				else
-				{
-					foreach (string str1 in Directory.EnumerateFiles(".", "*.stream"))
-					{
-						Console.WriteLine(string.Concat("Decoding: ", str1.Replace(".\\", "")));
-						Program.Decode(str1, str1.Replace(".stream", ".wav"));
-					}
-				}
-			}
-			catch (Exception exception)
-			{
-				Console.WriteLine("[ERROR] Input File: {0} Exception occured: {1} Please report this error if it is not related to the input file not being a wave file.", args[1], exception.Message);
-			}
-		}
-	}
+            try
+            {
+                if (args[0] == "-d")
+                {
+                    Decode(args[1], args[2]);
+                }
+                else if (args[0] == "-e")
+                {
+                    Encode(args[1], args[2]);
+                }
+                else if (args[0] == "-e_all")
+                {
+                    foreach (string file in Directory.EnumerateFiles(".", "*.wav"))
+                    {
+                        Console.WriteLine("Encoding: " + file.Replace(".\\", ""));
+                        Encode(file, file.Replace(".wav", ".stream"));
+                    }
+                }
+                else if (args[0] == "-d_all")
+                {
+                    foreach (string file in Directory.EnumerateFiles(".", "*.stream"))
+                    {
+                        Console.WriteLine("Decoding: " + file.Replace( ".\\", "" ));
+                        Decode(file, file.Replace(".stream", ".wav"));
+                    }
+                }
+                else
+                {
+                    Console.WriteLine("[ERROR] Must specify either -d to decode, or -e to encode.");
+                }
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(
+                    "[ERROR] Input File: {0} Exception occured: {1} Please report this error if it is not related to the input file not being a wave file.",
+                    args[1],
+                    e.Message);
+            }
+        }
+
+        public static void Decode(string inFile, string outFile)
+        {
+            using (var inStream = new FileStream(inFile, FileMode.Open, FileAccess.Read))
+            {
+                int dataSize = 0;
+                var reader = new BinaryReader(inStream);
+                WAVHeader header = WAVHeader.DecodeHeader(reader);
+                if (header.Format != 2 && header.BitsPerSample != 4
+                    && header.BlockAlignment != (36 * header.ChannelCount))
+                {
+                    Console.WriteLine(
+                        "[ERROR] Invalid input file format. Expected Wwise IMA ADPCM. Found Format: {0}, BitsPerSample: {1}, BlockAlignment: {2}, SampleRate: {3}",
+                        header.Format,
+                        header.BitsPerSample,
+                        header.BlockAlignment,
+                        header.SampleRate);
+                    return;
+                }
+                using (var outStream = new FileStream(outFile, FileMode.Create, FileAccess.Write))
+                {
+                    var writer = new BinaryWriter(outStream);
+                    var newHeader = new WAVHeader
+                                        {
+                                            Format = 1,
+                                            ChannelCount = header.ChannelCount,
+                                            SampleRate = header.SampleRate,
+                                            BitsPerSample = 16
+                                        };
+                    newHeader.BlockAlignment = (ushort)(newHeader.ChannelCount * 2);
+                    newHeader.DataRate = newHeader.BlockAlignment * newHeader.SampleRate;
+                    WAVHeader.EncodeHeader(writer, newHeader);
+                    var outBuffer = new short[64 * newHeader.ChannelCount];
+                    for (int i = 0; i < header.DataLength / header.BlockAlignment; ++i)
+                    {
+                        for (int channel = 0; channel < header.ChannelCount; ++channel)
+                        {
+                            IMADecoder.Decode(reader, ref outBuffer, 1, channel, header.ChannelCount);
+                        }
+
+                        foreach (short sample in outBuffer)
+                        {
+                            writer.Write(sample);
+                            dataSize += 2;
+                        }
+                    }
+
+                    writer.Seek(4, SeekOrigin.Begin);
+                    writer.Write(4 + 24 + 8 + dataSize);
+                    writer.Seek(0x28, SeekOrigin.Begin);
+                    writer.Write(dataSize);
+                    reader.Close();
+                    writer.Close();
+                }
+            }
+        }
+
+        public static void Encode(string inFile, string outFile)
+        {
+            using (var inStream = new FileStream(inFile, FileMode.Open, FileAccess.Read))
+            {
+                int dataSize = 0;
+                var reader = new BinaryReader(inStream);
+                WAVHeader header = WAVHeader.DecodeHeader(reader);
+                if (header.BitsPerSample != 16 || header.Format != 1)
+                {
+                    Console.WriteLine("[ERROR] Input file must be a well formed signed 16bit PCM WAV file.");
+                    return;
+                }
+                using (var outStream = new FileStream(outFile, FileMode.Create, FileAccess.Write))
+                {
+                    var writer = new BinaryWriter(outStream);
+                    var newHeader = new WAVHeader
+                                        {
+                                            Format = 2,
+                                            ChannelCount = header.ChannelCount,
+                                            SampleRate = header.SampleRate,
+                                            BitsPerSample = 4
+                                        };
+                    newHeader.BlockAlignment = (ushort)(36 * newHeader.ChannelCount);
+                    newHeader.DataRate = (newHeader.SampleRate / 64) * newHeader.BlockAlignment;
+                    WAVHeader.EncodeIMAHeader(writer, newHeader);
+                    var encoders = new IMAEncoder[newHeader.ChannelCount];
+                    for (int i = 0; i < newHeader.ChannelCount; ++i)
+                    {
+                        encoders[i] = new IMAEncoder();
+                    }
+                    long basePosition = reader.BaseStream.Position;
+                    int currentPosition = 64;
+                    for (int i = 0; (header.DataLength - (currentPosition - 64)) / header.BlockAlignment > 64; ++i)
+                    {
+                        for (int channel = 0; channel < header.ChannelCount; ++channel)
+                        {
+                            reader.BaseStream.Seek(basePosition + (channel * 2), SeekOrigin.Begin);
+                            encoders[channel].Encode(reader, header.ChannelCount);
+                            encoders[channel].WriteOut(writer);
+                            dataSize += 36;
+                        }
+                        basePosition += header.BlockAlignment * 64;
+                        currentPosition += (header.BlockAlignment * 64);
+                    }
+                    var remainingSamples = (header.DataLength - (currentPosition - 64)) / header.BlockAlignment;
+                    for (int channel = 0; remainingSamples > 0 && channel < header.ChannelCount; ++channel)
+                    {
+                        reader.BaseStream.Seek(basePosition + (channel * 2), SeekOrigin.Begin);
+                        encoders[channel].Encode(reader, header.ChannelCount, (int)remainingSamples);
+                        encoders[channel].WriteOut(writer);
+                        dataSize += 36;
+                    }
+
+                    writer.Seek(4, SeekOrigin.Begin);
+                    writer.Write((int)outStream.Length - 8);
+                    writer.Seek(0x3C, SeekOrigin.Begin);
+                    writer.Write(dataSize);
+                    reader.Close();
+                    writer.Close();
+                }
+            }
+        }
+
+        #endregion
+    }
 }

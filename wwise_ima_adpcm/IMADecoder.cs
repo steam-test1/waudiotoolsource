@@ -1,74 +1,126 @@
-using System;
-using System.IO;
-
+﻿// --------------------------------------------------------------------------------------------------------------------
+// <copyright file="ImaDecoder.cs" company="Zwagoth">
+//   This code is released into the public domain by Zwagoth.
+// </copyright>
+// <summary>
+//   Wwise IMA ADPCM Decoder.
+// </summary>
+// --------------------------------------------------------------------------------------------------------------------
 namespace wwise_ima_adpcm
 {
-	public class IMADecoder
-	{
-		public IMADecoder()
-		{
-		}
+    using System.IO;
 
-		public static void Decode(BinaryReader inputStream, ref short[] outputBuffer, int blocksToDecode, int channel, int channelCount)
-		{
-			int num = 0;
-			byte num1 = 0;
-			short num2 = inputStream.ReadInt16();
-			int num3 = inputStream.ReadByte();
-			inputStream.ReadByte();
-			short num4 = num2;
-			int num5 = num3;
-			int num6 = num;
-			num = num6 + 1;
-			outputBuffer[channelCount * num6 + channel] = num2;
-			for (int i = 1; i < 64; i++)
-			{
-				if ((i & 1) != 1)
-				{
-					num4 = IMADecoder.DecodeSample((byte)(num1 >> 4), num4, IMAConstants.StepTable[num5]);
-					num5 = IMAConstants.NextStepIndex((int)(num1 >> 4), num5);
-				}
-				else
-				{
-					num1 = inputStream.ReadByte();
-					num4 = IMADecoder.DecodeSample((byte)(num1 & 15), num4, IMAConstants.StepTable[num5]);
-					num5 = IMAConstants.NextStepIndex((int)(num1 & 15), num5);
-				}
-				int num7 = num;
-				num = num7 + 1;
-				outputBuffer[channelCount * num7 + channel] = num4;
-			}
-		}
+    /// <summary>
+    ///     TODO: Update summary.
+    /// </summary>
+    public class IMADecoder
+    {
+        #region Public Methods and Operators
 
-		public static short DecodeSample(byte sample, short previousSample, int step)
-		{
-			int num = step >> 3;
-			if ((sample & 4) == 4)
-			{
-				num += step;
-			}
-			if ((sample & 2) == 2)
-			{
-				num = num + (step >> 1);
-			}
-			if ((sample & 1) == 1)
-			{
-				num = num + (step >> 2);
-			}
-			if ((sample & 8) == 8)
-			{
-				num = -num;
-			}
-			int num1 = num + previousSample;
-			if (num1 > 32767)
-			{
-				num1 = 32767;
-			}
-			else if (num1 < -32768)
-			{
-				num1 = -32768;
-			}
-			return (short)num1;
-		}
-	}
+        /// <summary>
+        /// The adjustment index.
+        /// </summary>
+        /// <param name="sample">
+        /// The sample.
+        /// </param>
+        /// <param name="previousStep">
+        /// The previous step.
+        /// </param>
+        /// <returns>
+        /// The <see cref="int"/>.
+        /// </returns>
+
+        /// <summary>
+        /// The decoder.
+        /// </summary>
+        /// <param name="inputStream">
+        /// The input stream.
+        /// </param>
+        /// <param name="outputBuffer">
+        /// The output buffer.
+        /// </param>
+        /// <param name="blocksToDecode">
+        /// The blocks to decode.
+        /// </param>
+        /// <param name="channel">
+        /// The channel.
+        /// </param>
+        public static void Decode(BinaryReader inputStream, ref short[] outputBuffer, int blocksToDecode, int channel, int channelCount)
+        {
+            int sampleNumber = 0;
+            byte sample = 0;
+            short seedSample = inputStream.ReadInt16();
+            int seedStep = inputStream.ReadByte();
+            inputStream.ReadByte(); // Alignment byte.
+            short previousSample = seedSample;
+            int previousStep = seedStep;
+            outputBuffer[(channelCount * sampleNumber++) + channel] = seedSample;
+            for (int i = 1; i < 64; ++i)
+            {
+                if ((i & 1) == 1)
+                {
+                    sample = inputStream.ReadByte();
+                    previousSample = DecodeSample((byte)(sample & 0xF), previousSample, IMAConstants.StepTable[previousStep]);
+                    previousStep = IMAConstants.NextStepIndex((byte)(sample & 0xF), previousStep);
+                }
+                else
+                {
+                    previousSample = DecodeSample((byte)(sample >> 4), previousSample, IMAConstants.StepTable[previousStep]);
+                    previousStep = IMAConstants.NextStepIndex((byte)(sample >> 4), previousStep);
+                }
+
+                outputBuffer[(channelCount * sampleNumber++) + channel] = previousSample;
+            }
+        }
+
+        /// <summary>
+        /// The decode sample.
+        /// </summary>
+        /// <param name="sample">
+        /// The sample.
+        /// </param>
+        /// <param name="previousSample">
+        /// The previous sample.
+        /// </param>
+        /// <param name="step">
+        /// The step.
+        /// </param>
+        /// <returns>
+        /// The <see cref="short"/>.
+        /// </returns>
+        public static short DecodeSample(byte sample, short previousSample, int step)
+        {
+            int difference = step >> 3;
+            if ((sample & 4) == 4)
+            {
+                difference += step;
+            }
+            if ((sample & 2) == 2)
+            {
+                difference += step >> 1;
+            }
+            if ((sample & 1) == 1)
+            {
+                difference += step >> 2;
+            }
+            if ((sample & 8) == 8)
+            {
+                difference = -difference;
+            }
+
+            int newSample = difference + previousSample;
+            if (newSample > 32767)
+            {
+                newSample = 32767;
+            }
+            else if (newSample < -32768)
+            {
+                newSample = -32768;
+            }
+
+            return (short)newSample;
+        }
+
+        #endregion
+    }
 }
